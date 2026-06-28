@@ -16,25 +16,14 @@ if not DB_PATH.exists():
 def setup_log_tables():
     conn = get_db()
     conn.executescript('''
-        CREATE TABLE IF NOT EXISTS search_logs (
+        CREATE TABLE IF NOT EXISTS logs (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
             ts           DATETIME DEFAULT CURRENT_TIMESTAMP,
             session_id   TEXT,
-            query        TEXT NOT NULL,
-            result_count INTEGER,
-            top_result   TEXT,
-            top_score    REAL,
-            top_status   TEXT
-        );
-
-        CREATE TABLE IF NOT EXISTS interaction_logs (
-            id           INTEGER PRIMARY KEY AUTOINCREMENT,
-            ts           DATETIME DEFAULT CURRENT_TIMESTAMP,
-            session_id   TEXT,
+            event        TEXT NOT NULL,
             query        TEXT,
             product_id   INTEGER,
-            product_name TEXT,
-            action       TEXT
+            product_name TEXT
         );
     ''')
     conn.commit()
@@ -211,21 +200,6 @@ def api_search():
     except ValueError:
         limit = 20
     results = _hybrid_search(q, limit=limit)
-
-    # log search
-    top = results[0] if results else None
-    session_id = request.args.get('sid', '')
-    try:
-        conn = get_db()
-        conn.execute(
-            'INSERT INTO search_logs (session_id, query, result_count, top_result, top_score, top_status) VALUES (?,?,?,?,?,?)',
-            (session_id, q, len(results), top['name'] if top else None, top['score'] if top else None, top['status'] if top else None)
-        )
-        conn.commit()
-        conn.close()
-    except Exception:
-        pass
-
     return jsonify(results)
 
 
@@ -235,8 +209,8 @@ def api_log():
     try:
         conn = get_db()
         conn.execute(
-            'INSERT INTO interaction_logs (session_id, query, product_id, product_name, action) VALUES (?,?,?,?,?)',
-            (data.get('sid', ''), data.get('query', ''), data.get('product_id'), data.get('product_name', ''), data.get('action', ''))
+            'INSERT INTO logs (session_id, event, query, product_id, product_name) VALUES (?,?,?,?,?)',
+            (data.get('sid', ''), data.get('event', ''), data.get('query', ''), data.get('product_id'), data.get('product_name', ''))
         )
         conn.commit()
         conn.close()

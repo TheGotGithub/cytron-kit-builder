@@ -9,16 +9,16 @@ function getSessionId() {
 }
 const SESSION_ID = getSessionId();
 
-function logInteraction(action, productId, productName) {
+function logEvent(event, productId, productName) {
     fetch('/api/log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             sid:          SESSION_ID,
+            event:        event,
             query:        searchQuery,
-            product_id:   productId,
-            product_name: productName,
-            action:       action,
+            product_id:   productId   || null,
+            product_name: productName || '',
         }),
     }).catch(() => {});
 }
@@ -183,6 +183,10 @@ function bindEvents() {
         searchLoading = true;
         renderProducts();
         searchDebounce = setTimeout(() => doVectorSearch(searchQuery), 400);
+    });
+
+    document.getElementById('search-input').addEventListener('keydown', e => {
+        if (e.key === 'Enter' && searchQuery) logEvent('search');
     });
 
     document.getElementById('sidebar-all').addEventListener('click', selectAll);
@@ -388,14 +392,14 @@ function addToKit(pid) {
     } else {
         kitItems.push({ product, qty: 1, isPlaceholder: false, note: '', isSubstitute: false });
     }
-    logInteraction('add_kit', product.id, product.name);
+    logEvent('add_kit', product.id, product.name);
     renderKitList();
     renderProducts();
 }
 
 function addPlaceholderToKit(name) {
     kitItems.push({ product: null, name, qty: 1, isPlaceholder: true, note: '', isSubstitute: false });
-    logInteraction('no_stock', null, name);
+    logEvent('no_stock', null, name);
     renderKitList();
     showToast(`เพิ่ม "${name}" เป็นไม่มีสินค้าแล้ว`);
 }
@@ -567,7 +571,6 @@ function copyToClipboard() {
 function showPreview(pid) {
     const product = productMap[String(pid)] || vectorResults.find(r => String(r.id) === String(pid));
     if (!product || !product.product_url) return;
-    logInteraction('view', product.id, product.name);
     const proxyUrl = `/api/proxy?url=${encodeURIComponent(product.product_url)}`;
     document.getElementById('preview-iframe').src = proxyUrl;
     document.getElementById('preview-title').textContent = product.name;
