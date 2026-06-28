@@ -1,3 +1,28 @@
+// ── Session & Logging ────────────────────────────────────────────────────────
+function getSessionId() {
+    let sid = localStorage.getItem('cytron_sid');
+    if (!sid) {
+        sid = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+        localStorage.setItem('cytron_sid', sid);
+    }
+    return sid;
+}
+const SESSION_ID = getSessionId();
+
+function logInteraction(action, productId, productName) {
+    fetch('/api/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            sid:          SESSION_ID,
+            query:        searchQuery,
+            product_id:   productId,
+            product_name: productName,
+            action:       action,
+        }),
+    }).catch(() => {});
+}
+
 // ── Tab ──────────────────────────────────────────────────────────────────────
 let activeTab = 'kit';
 
@@ -224,7 +249,7 @@ function renderSidebar() {
 
 async function doVectorSearch(q) {
     try {
-        const res = await fetch(`/api/products/search?q=${encodeURIComponent(q)}&limit=20`);
+        const res = await fetch(`/api/products/search?q=${encodeURIComponent(q)}&limit=20&sid=${SESSION_ID}`);
         const data = await res.json();
         // enrich ด้วย category/subcategory จาก productMap
         vectorResults = data
@@ -363,12 +388,14 @@ function addToKit(pid) {
     } else {
         kitItems.push({ product, qty: 1, isPlaceholder: false, note: '', isSubstitute: false });
     }
+    logInteraction('add_kit', product.id, product.name);
     renderKitList();
     renderProducts();
 }
 
 function addPlaceholderToKit(name) {
     kitItems.push({ product: null, name, qty: 1, isPlaceholder: true, note: '', isSubstitute: false });
+    logInteraction('no_stock', null, name);
     renderKitList();
     showToast(`เพิ่ม "${name}" เป็นไม่มีสินค้าแล้ว`);
 }
@@ -540,6 +567,7 @@ function copyToClipboard() {
 function showPreview(pid) {
     const product = productMap[String(pid)] || vectorResults.find(r => String(r.id) === String(pid));
     if (!product || !product.product_url) return;
+    logInteraction('view', product.id, product.name);
     const proxyUrl = `/api/proxy?url=${encodeURIComponent(product.product_url)}`;
     document.getElementById('preview-iframe').src = proxyUrl;
     document.getElementById('preview-title').textContent = product.name;

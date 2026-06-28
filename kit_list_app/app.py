@@ -12,6 +12,36 @@ app = Flask(__name__)
 if not DB_PATH.exists():
     setup()
 
+
+def setup_log_tables():
+    conn = get_db()
+    conn.executescript('''
+        CREATE TABLE IF NOT EXISTS search_logs (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts           DATETIME DEFAULT CURRENT_TIMESTAMP,
+            session_id   TEXT,
+            query        TEXT NOT NULL,
+            result_count INTEGER,
+            top_result   TEXT,
+            top_score    REAL,
+            top_status   TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS interaction_logs (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts           DATETIME DEFAULT CURRENT_TIMESTAMP,
+            session_id   TEXT,
+            query        TEXT,
+            product_id   INTEGER,
+            product_name TEXT,
+            action       TEXT
+        );
+    ''')
+    conn.commit()
+    conn.close()
+
+setup_log_tables()
+
 # โหลด model ครั้งเดียวตอน startup
 from rag_search.vector_searcher import ensure_ready
 from rag_search.hybrid_searcher import search as _hybrid_search
@@ -181,7 +211,38 @@ def api_search():
     except ValueError:
         limit = 20
     results = _hybrid_search(q, limit=limit)
+
+    # log search
+    top = results[0] if results else None
+    session_id = request.args.get('sid', '')
+    try:
+        conn = get_db()
+        conn.execute(
+            'INSERT INTO search_logs (session_id, query, result_count, top_result, top_score, top_status) VALUES (?,?,?,?,?,?)',
+            (session_id, q, len(results), top['name'] if top else None, top['score'] if top else None, top['status'] if top else None)
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
     return jsonify(results)
+
+
+@app.route('/api/log', methods=['POST'])
+def api_log():
+    data = request.get_json(force=True)
+    try:
+        conn = get_db()
+        conn.execute(
+            'INSERT INTO interaction_logs (session_id, query, product_id, product_name, action) VALUES (?,?,?,?,?)',
+            (data.get('sid', ''), data.get('query', ''), data.get('product_id'), data.get('product_name', ''), data.get('action', ''))
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+    return jsonify({'ok': True})
 
 
 @app.route('/api/products/<int:id>')
