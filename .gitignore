@@ -1,0 +1,43 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+
+# macOS
+.DS_Store
+.AppleDouble
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test / dev artifacts
+test/
+rag_search_oldmodel/
+temp/
+.pytest_cache/
+rag_search/tests/analysis_pi5.png
+
+# Plots
+*.png
+
+# Logs
+*.log
+/tmp/
+
+# Model cache (ดาวน์โหลดอัตโนมัติจาก HuggingFace)
+# ~/.cache/huggingface/  ← อยู่นอก repo อยู่แล้ว
+
+# cytron.db อยู่ใน repo (6.6MB) — comment บรรทัดนี้ออกถ้าไม่ต้องการ
+# cytron_db/cytron.db

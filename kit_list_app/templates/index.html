@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kit List Generator — Cytron</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header>
+        <span class="logo">📦 Kit List Generator</span>
+        <div class="search-wrap">
+            <input type="search" id="search-input" placeholder="ค้นหาสินค้า..." autocomplete="off">
+        </div>
+        <a href="/products" style="color:rgba(255,255,255,0.7);font-size:0.8rem;text-decoration:none;margin-left:auto;white-space:nowrap">⚙️ Product Manager</a>
+    </header>
+
+    <div class="layout">
+        <aside id="sidebar">
+            <div class="sidebar-all" id="sidebar-all">🏠 ทั้งหมด</div>
+            <div id="cat-tree"></div>
+        </aside>
+
+        <main>
+            <div id="section-label" class="section-label">ทั้งหมด</div>
+            <div id="product-grid" class="product-grid"></div>
+        </main>
+
+        <div id="preview-panel" class="preview-panel">
+            <div class="preview-header">
+                <span id="preview-title" class="preview-title"></span>
+                <a id="preview-ext" href="#" target="_blank" class="btn-ext">🔗 เปิดหน้าเต็ม</a>
+                <button class="preview-close" onclick="closePreview()">✕</button>
+            </div>
+            <iframe id="preview-iframe" src="" frameborder="0"></iframe>
+        </div>
+
+        <section class="kit-panel">
+            <div class="kit-header">
+                <h2>Kit List <span id="kit-count" class="badge">0</span></h2>
+                <div class="kit-header-actions">
+                    <button id="add-nostock-btn" class="btn-nostock" onclick="addNoStockFromSearch()" title="เพิ่มรายการที่ไม่มีสินค้า">+ ไม่มีสินค้า</button>
+                    <button id="clear-btn" class="btn-ghost">ล้างทั้งหมด</button>
+                </div>
+            </div>
+            <div id="kit-items" class="kit-items"></div>
+            <div class="kit-footer">
+                <textarea id="kit-output" readonly placeholder="เลือกสินค้าเพื่อดู output..."></textarea>
+                <button id="copy-btn" class="btn-primary">📋 Copy ทั้งหมด</button>
+            </div>
+        </section>
+    </div>
+
+    <div id="toast" class="toast"></div>
+    <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Manager — Cytron</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/products.css">
+</head>
+<body>
+    <header>
+        <span class="logo">⚙️ Product Manager</span>
+        <div class="search-wrap">
+            <input type="search" id="product-search" placeholder="ค้นหาสินค้า..." autocomplete="off">
+        </div>
+        <a href="/" class="header-link">← Kit List</a>
+    </header>
+
+    <div class="compat-layout">
+        <!-- Left Sidebar: Product list & Add product button -->
+        <aside class="compat-sidebar">
+            <div class="add-product-action">
+                <button id="add-product-btn" class="btn-primary-btn">+ เพิ่มสินค้า</button>
+            </div>
+            <div class="sidebar-label">สินค้าทั้งหมด</div>
+            <div id="product-list"></div>
+        </aside>
+
+        <!-- Right Main Panel: Detail view tabs & edit panel -->
+        <main class="compat-main" id="compat-main">
+            <div class="placeholder">
+                <div class="ph-icon">⚙️</div>
+                <div>เลือกสินค้าทางซ้าย<br>หรือกดปุ่ม "+ เพิ่มสินค้า" เพื่อจัดการ</div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Confirm Delete Modal (Custom implementation) -->
+    <div id="delete-modal" class="modal-overlay">
+        <div class="modal-card">
+            <h3>⚠️ ยืนยันการลบสินค้า</h3>
+            <p>คุณแน่ใจหรือไม่ว่าต้องการลบสินค้านี้ออกจากระบบ? การลบนี้จะยกเลิกความเข้ากันได้ (Compatibility) ทั้งหมดของสินค้านี้โดยถาวรและไม่สามารถเรียกคืนได้</p>
+            <div class="modal-buttons">
+                <button id="confirm-delete-btn" class="btn-danger">ลบสินค้า</button>
+                <button id="cancel-delete-btn" class="btn-cancel">ยกเลิก</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+    <script src="/static/products.js"></script>
+</body>
+</html>
