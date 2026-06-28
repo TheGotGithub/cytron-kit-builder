@@ -284,6 +284,9 @@ function toggleCat(ci, catName) {
     }
     activeCat    = catName;
     activeSubcat = null;
+    searchQuery  = '';
+    vectorResults = [];
+    document.getElementById('search-input').value = '';
     renderSidebar();
     renderProducts();
 }
@@ -291,6 +294,9 @@ function toggleCat(ci, catName) {
 function selectSubcat(catName, subcatName) {
     activeCat    = catName;
     activeSubcat = subcatName;
+    searchQuery  = '';
+    vectorResults = [];
+    document.getElementById('search-input').value = '';
     if (!expandedCats.has(catalog.findIndex(c => c.name === catName))) {
         expandedCats.add(catalog.findIndex(c => c.name === catName));
     }
