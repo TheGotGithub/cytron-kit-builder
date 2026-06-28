@@ -199,8 +199,12 @@ def ensure_ready():
     conn.close()
 
     if empty_desc > 100:
-        print('[ensure_ready] indexing descriptions...')
-        populate_descriptions()
+        from rag_search.parser import PRODUCT_LINK_PATH
+        if PRODUCT_LINK_PATH.exists():
+            print('[ensure_ready] indexing descriptions...')
+            populate_descriptions()
+        else:
+            print('[ensure_ready] skipping descriptions (no product_link/)')
 
     if empty_emb > 0 or wrong_dim > 0:
         if wrong_dim > 0:
