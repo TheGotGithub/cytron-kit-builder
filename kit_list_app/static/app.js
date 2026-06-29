@@ -564,13 +564,24 @@ function getKitText() {
 function copyToClipboard() {
     const text = getKitText();
     if (!text) { showToast('ยังไม่มีสินค้าใน Kit List'); return; }
-    navigator.clipboard.writeText(text)
-        .then(() => showToast('✓ Copy แล้ว! วาง Line ได้เลย'))
-        .catch(() => {
-            document.getElementById('kit-output').select();
-            document.execCommand('copy');
-            showToast('✓ Copy แล้ว!');
-        });
+
+    const done = () => showToast('✓ Copy แล้ว! วาง Line ได้เลย');
+    const fallback = () => {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        try { document.execCommand('copy'); done(); } catch {}
+        document.body.removeChild(ta);
+    };
+
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(done).catch(fallback);
+    } else {
+        fallback();
+    }
 }
 
 // ── Preview Panel ─────────────────────────────────────────────────────────────
