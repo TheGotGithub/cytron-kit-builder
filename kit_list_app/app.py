@@ -34,7 +34,9 @@ setup_log_tables()
 # โหลด model ครั้งเดียวตอน startup
 from rag_search.vector_searcher import ensure_ready
 from rag_search.hybrid_searcher import search as _hybrid_search
+from rag_search.embedder import get_model
 ensure_ready()
+get_model()  # warm-up: โหลด model ไว้ก่อนเพื่อไม่ให้ช้าตอน search ครั้งแรก
 
 
 # ── Catalog ───────────────────────────────────────────────────────────────────
