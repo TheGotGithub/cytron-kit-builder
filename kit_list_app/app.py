@@ -5,6 +5,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))  # software/
 from cytron_db import get_db, setup, DB_PATH, get_compatible, ordered_ids
 
 import urllib.request
+import re
 from flask import Flask, jsonify, render_template, request, Response
 
 app = Flask(__name__)
@@ -46,17 +47,68 @@ _catalog: list | None = None
 
 def load_catalog() -> list:
     conn = get_db()
-    rows = conn.execute('''
-        SELECT id, name, category, subcategory, price, product_url, image_url
-        FROM products
-        ORDER BY cat_order, subcat_order, prod_order, name
-    ''').fetchall()
+    # Check if parent_id column exists
+    cols = [r[1] for r in conn.execute('PRAGMA table_info(products)').fetchall()]
+    has_parent_id = 'parent_id' in cols
+    
+    if has_parent_id:
+        parent_rows = conn.execute('''
+            SELECT id, name, category, subcategory, price, product_url, image_url
+            FROM products
+            WHERE parent_id IS NULL
+            ORDER BY cat_order, subcat_order, prod_order, name
+        ''').fetchall()
+        
+        variant_rows = conn.execute('''
+            SELECT id, parent_id, name, price, product_url, image_url
+            FROM products
+            WHERE parent_id IS NOT NULL
+            ORDER BY name
+        ''').fetchall()
+    else:
+        parent_rows = conn.execute('''
+            SELECT id, name, category, subcategory, price, product_url, image_url
+            FROM products
+            ORDER BY cat_order, subcat_order, prod_order, name
+        ''').fetchall()
+        variant_rows = []
+        
     conn.close()
+
+    # Map parent id to parent row for fast lookup
+    parent_map = {p['id']: p for p in parent_rows}
+
+    # Group variants by parent_id
+    variants_by_parent = {}
+    for v in variant_rows:
+        pid = v['parent_id']
+        if pid not in variants_by_parent:
+            variants_by_parent[pid] = []
+            
+        full_name = v['name']
+        parent_p = parent_map.get(pid)
+        parent_name = parent_p['name'] if parent_p else ""
+        
+        match = re.search(r'\(([^)]+)\)$', full_name)
+        if match:
+            option_name = match.group(1)
+        else:
+            option_name = full_name
+            if parent_name and full_name.startswith(parent_name):
+                option_name = full_name[len(parent_name):].strip(' ()')
+            
+        variants_by_parent[pid].append({
+            'id':          v['id'],
+            'name':        option_name,
+            'price':       v['price'],
+            'product_url': v['product_url'],
+            'image_url':   v['image_url'],
+        })
 
     catalog  = []
     cat_idx  = {}
 
-    for row in rows:
+    for row in parent_rows:
         cat = row['category']
         sub = row['subcategory']
 
@@ -70,12 +122,16 @@ def load_catalog() -> list:
             cat_entry['subcategories'][sub] = sub_entry
             cat_entry['_list'].append(sub_entry)
 
+        pid = row['id']
+        p_variants = variants_by_parent.get(pid, [])
+        
         cat_entry['subcategories'][sub]['products'].append({
-            'id':          row['id'],
+            'id':          pid,
             'name':        row['name'],
             'price':       row['price'],
             'product_url': row['product_url'],
             'image_url':   row['image_url'],
+            'variants':    p_variants
         })
 
     for cat_entry in catalog:
@@ -202,7 +258,94 @@ def api_search():
     except ValueError:
         limit = 20
     results = _hybrid_search(q, limit=limit)
-    return jsonify(results)
+    
+    # Group search results by parent product
+    grouped_results = []
+    seen_parents = set()
+    
+    conn = get_db()
+    for r in results:
+        prod_id = r['id']
+        prod_row = conn.execute(
+            'SELECT parent_id, name, price, product_url, image_url, category, subcategory '
+            'FROM products WHERE id = ?', (prod_id,)
+        ).fetchone()
+        
+        if not prod_row:
+            continue
+            
+        parent_id = prod_row['parent_id']
+        
+        if parent_id is not None:
+            group_id = parent_id
+            matched_var_id = prod_id
+        else:
+            group_id = prod_id
+            matched_var_id = None
+            
+        if group_id in seen_parents:
+            for gr in grouped_results:
+                if gr['id'] == group_id and matched_var_id is not None and gr['matched_variant_id'] is None:
+                    gr['matched_variant_id'] = matched_var_id
+            continue
+            
+        seen_parents.add(group_id)
+        
+        if parent_id is not None:
+            parent_row = conn.execute(
+                'SELECT id, name, price, product_url, image_url, category, subcategory, description '
+                'FROM products WHERE id = ?', (parent_id,)
+            ).fetchone()
+        else:
+            parent_row = conn.execute(
+                'SELECT id, name, price, product_url, image_url, category, subcategory, description '
+                'FROM products WHERE id = ?', (prod_id,)
+            ).fetchone()
+            
+        if not parent_row:
+            continue
+            
+        variant_rows = conn.execute(
+            'SELECT id, name, price, product_url, image_url '
+            'FROM products WHERE parent_id = ? ORDER BY name', (group_id,)
+        ).fetchall()
+        
+        parent_name = parent_row['name']
+        variants = []
+        for v in variant_rows:
+            full_name = v['name']
+            match = re.search(r'\(([^)]+)\)$', full_name)
+            if match:
+                option_name = match.group(1)
+            else:
+                option_name = full_name
+                if parent_name and full_name.startswith(parent_name):
+                    option_name = full_name[len(parent_name):].strip(' ()')
+                    
+            variants.append({
+                'id':          v['id'],
+                'name':        option_name,
+                'price':       v['price'],
+                'product_url': v['product_url'],
+                'image_url':   v['image_url'],
+            })
+            
+        grouped_results.append({
+            'id': parent_row['id'],
+            'name': parent_row['name'],
+            'price': parent_row['price'],
+            'product_url': parent_row['product_url'],
+            'image_url': parent_row['image_url'],
+            'category': parent_row['category'],
+            'subcategory': parent_row['subcategory'],
+            'score': r.get('score', 0.0),
+            'status': r.get('status', 'found'),
+            'variants': variants,
+            'matched_variant_id': matched_var_id
+        })
+        
+    conn.close()
+    return jsonify(grouped_results)
 
 
 @app.route('/api/log', methods=['POST'])

@@ -166,6 +166,21 @@ function buildProductList() {
                 const product = { ...p, category: cat.name, subcategory: sub.name };
                 productMap[String(p.id)] = product;
                 allProducts.push(product);
+                
+                // Index variants in productMap too
+                if (p.variants && p.variants.length > 0) {
+                    for (const v of p.variants) {
+                        productMap[String(v.id)] = {
+                            id: v.id,
+                            name: `${p.name} (${v.name})`,
+                            price: v.price,
+                            product_url: v.product_url,
+                            image_url: v.image_url,
+                            category: cat.name,
+                            subcategory: sub.name
+                        };
+                    }
+                }
             }
         }
     }
@@ -206,13 +221,17 @@ function bindEvents() {
 
     // Event delegation — product grid
     document.getElementById('product-grid').addEventListener('click', e => {
+        if (e.target.closest('.variant-select')) return;
+        
         const addBtn = e.target.closest('.add-btn');
         const card   = e.target.closest('.product-card');
         if (!card) return;
+        
+        const pid = card.dataset.activeId || card.dataset.pid;
         if (addBtn) {
-            addToKit(card.dataset.pid);
+            addToKit(pid);
         } else {
-            showPreview(card.dataset.pid);
+            showPreview(pid);
         }
     });
 
@@ -356,29 +375,95 @@ function renderProducts() {
                <button class="btn-no-stock" onclick="addPlaceholderToKit('${escAttr(searchQuery)}')">+ เพิ่ม "${escHtml(searchQuery)}" เป็น ไม่มีสินค้า</button>
            </div>`
         : '';
+        
     grid.innerHTML = noStockBanner + products.map(p => {
         const pid   = String(p.id);
-        const inKit = isInKit(pid);
-        const imgTag = p.image_url
-            ? `<img class="product-img" src="${escAttr(p.image_url)}" alt="" loading="lazy" onerror="this.replaceWith(makePh())">`
-            : `<div class="product-img-ph">📦</div>`;
+        const hasVariants = p.variants && p.variants.length > 0;
+        
+        let selectedVariantId = pid;
+        if (hasVariants) {
+            if (p.matched_variant_id) {
+                selectedVariantId = String(p.matched_variant_id);
+            } else {
+                selectedVariantId = String(p.variants[0].id);
+            }
+        }
+        
+        const selectedVariant = hasVariants 
+            ? p.variants.find(v => String(v.id) === selectedVariantId) || p.variants[0]
+            : null;
+            
+        const activeId = hasVariants ? String(selectedVariant.id) : pid;
+        const activePrice = hasVariants ? selectedVariant.price : p.price;
+        const activeImg = hasVariants ? (selectedVariant.image_url || p.image_url) : p.image_url;
+        
+        const inKit = isInKit(activeId);
+        
+        const imgTag = activeImg
+            ? `<img class="product-img" id="img-${pid}" src="${escAttr(activeImg)}" alt="" loading="lazy" onerror="this.replaceWith(makePh())">`
+            : `<div class="product-img-ph" id="img-${pid}">📦</div>`;
 
         const scoreBadge = isSearch && p.score != null
             ? `<div class="score-badge score-${p.status}">${p.score.toFixed(2)}</div>`
             : '';
 
+        const variantSelect = hasVariants
+            ? `<div class="variant-wrapper">
+                 <select class="variant-select" onchange="changeProductVariant(this, '${pid}')">
+                   ${p.variants.map(v => {
+                       const selectedAttr = String(v.id) === activeId ? 'selected' : '';
+                       return `<option value="${v.id}" ${selectedAttr} data-price="${escAttr(v.price)}" data-image="${escAttr(v.image_url)}" data-url="${escAttr(v.product_url)}">${escHtml(v.name)}</option>`;
+                   }).join('')}
+                 </select>
+               </div>`
+            : '';
+
         return `
-            <div class="product-card ${inKit ? 'in-kit' : ''}" data-pid="${pid}">
+            <div class="product-card ${inKit ? 'in-kit' : ''}" data-pid="${pid}" data-active-id="${activeId}" id="card-${pid}">
                 ${scoreBadge}
                 ${imgTag}
                 <div class="product-name">${escHtml(p.name)}</div>
-                <div class="product-price">${escHtml(p.price)}</div>
-                <button class="add-btn ${inKit ? 'added' : ''}">
+                ${variantSelect}
+                <div class="product-price" id="price-${pid}">${escHtml(activePrice)}</div>
+                <button class="add-btn ${inKit ? 'added' : ''}" id="btn-${pid}">
                     ${inKit ? '✓ เพิ่มแล้ว' : '+ เพิ่ม'}
                 </button>
             </div>
         `;
     }).join('');
+}
+
+window.changeProductVariant = function(selectEl, parentId) {
+    const selectedOpt = selectEl.options[selectEl.selectedIndex];
+    const variantId = selectedOpt.value;
+    const price = selectedOpt.dataset.price;
+    const imgUrl = selectedOpt.dataset.image;
+    
+    const card = document.getElementById(`card-${parentId}`);
+    if (card) {
+        card.dataset.activeId = variantId;
+        
+        const priceEl = document.getElementById(`price-${parentId}`);
+        if (priceEl) priceEl.textContent = price;
+        
+        const imgEl = document.getElementById(`img-${parentId}`);
+        if (imgEl && imgUrl) {
+            imgEl.src = imgUrl;
+        }
+        
+        const inKit = isInKit(variantId);
+        const btn = document.getElementById(`btn-${parentId}`);
+        if (btn) {
+            btn.className = `add-btn ${inKit ? 'added' : ''}`;
+            btn.textContent = inKit ? '✓ เพิ่มแล้ว' : '+ เพิ่ม';
+        }
+        
+        if (inKit) {
+            card.classList.add('in-kit');
+        } else {
+            card.classList.remove('in-kit');
+        }
+    }
 }
 
 function makePh() {
